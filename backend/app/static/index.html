@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>栖言 NestTalk - 控制面板</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/naive-ui"></script>
+<link rel="stylesheet" href="https://unpkg.com/naive-ui/dist/style.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f5}
+.login-box{max-width:360px;margin:80px auto;padding:40px;background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-box h2{text-align:center;margin-bottom:24px;color:#7c3aed}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:200px;background:#1e1e2e;color:#fff;padding:20px 0;flex-shrink:0}
+.sidebar .logo{padding:0 20px 20px;font-size:18px;font-weight:700;color:#7c3aed}
+.sidebar a{display:block;padding:12px 20px;color:#ccc;text-decoration:none;font-size:14px;cursor:pointer}
+.sidebar a:hover,.sidebar a.active{color:#fff;background:#7c3aed}
+.main{flex:1;padding:24px;overflow-y:auto}
+.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card h3{margin-bottom:12px}
+.stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{flex:1;min-width:140px;padding:16px;background:#f8f6ff;border-radius:8px;text-align:center}
+.stat .num{font-size:28px;font-weight:700;color:#7c3aed}
+.stat .label{font-size:13px;color:#999;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eee}
+th{color:#999;font-weight:500;font-size:13px}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px}
+.tag-on{background:#e8f5e9;color:#2e7d32}
+.tag-off{background:#f5f5f5;color:#999}
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+.btn-p{background:#7c3aed;color:#fff}
+.btn-d{background:#ff4757;color:#fff;margin-left:8px}
+.btn-g{background:#f0f0f0;color:#333}
+input,select,textarea{border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:14px;width:100%;margin:4px 0 12px}
+textarea{resize:vertical;min-height:80px}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal-box{background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
+.flex{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:768px){.sidebar{display:none}.main{padding:12px}.stat{min-width:100px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 登录 -->
+  <div v-if="!loggedIn" class="login-box">
+    <h2>🪹 栖言 NestTalk</h2>
+    <input v-model="password" type="password" placeholder="管理密码" @keydown.enter="login">
+    <button class="btn btn-p" style="width:100%;margin-top:12px" @click="login">登录</button>
+    <p style="text-align:center;margin-top:12px;color:#999;font-size:12px">默认密码: nesttalk2026</p>
+  </div>
+
+  <!-- 面板 -->
+  <div v-else class="layout">
+    <div class="sidebar">
+      <div class="logo">🪹 栖言</div>
+      <a :class="{active:page==='chat'}" @click="page='chat'">💬 对话</a>
+      <a :class="{active:page==='dashboard'}" @click="page='dashboard'">📊 仪表盘</a>
+      <a :class="{active:page==='characters'}" @click="page='characters'">🎭 角色</a>
+      <a :class="{active:page==='worldbooks'}" @click="page='worldbooks'">📚 世界书</a>
+      <a :class="{active:page==='presets'}" @click="page='presets'">⚙️ 预设</a>
+      <a :class="{active:page==='settings'}" @click="page='settings'">🔧 设置</a>
+      <a @click="logout" style="margin-top:20px;color:#ff6b6b">🚪 退出</a>
+    </div>
+
+    <!-- 聊天页 -->
+    <div class="main" v-if="page==='chat'">
+      <div class="card">
+        <h3>💬 对话</h3>
+        <div style="max-height:50vh;overflow-y:auto;margin-bottom:12px;background:#fafafa;border-radius:8px;padding:12px">
+          <div v-for="(m,i) in chatMessages" :key="i" style="margin-bottom:8px">
+            <strong :style="{color:m.role==='assistant'?'#7c3aed':'#333'}">{{ m.role==='assistant'?'🦊 小栖':'👤 你' }}:</strong>
+            <span style="white-space:pre-wrap">{{ m.content }}</span>
+          </div>
+          <div v-if="chatLoading" style="color:#999">正在输入...</div>
+        </div>
+        <div class="flex">
+          <input v-model="chatInput" placeholder="说点什么..." style="flex:1;margin:0" @keydown.enter="sendChat">
+          <button class="btn btn-p" @click="sendChat" :disabled="chatLoading">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 仪表盘 -->
+    <div class="main" v-if="page==='dashboard'">
+      <h3>📊 仪表盘</h3>
+      <div class="stats" style="margin-top:12px">
+        <div class="stat"><div class="num">{{ chars.length }}</div><div class="label">角色</div></div>
+        <div class="stat"><div class="num">{{ wbs.length }}</div><div class="label">世界书</div></div>
+        <div class="stat"><div class="num">{{ pres.length }}</div><div class="label">预设</div></div>
+        <div class="stat"><div class="num">1</div><div class="label">TG Bot</div></div>
+      </div>
+    </div>
+
+    <!-- 角色管理 -->
+    <div class="main" v-if="page==='characters'">
+      <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3>🎭 角色</h3>
+        <button class="btn btn-p" @click="showCharModal=null;charForm={name:'',personality:'',first_mes:''};showCharModal=true">+ 新建</button>
+      </div>
+      <div class="card" style="padding:12px">
+        <table><thead><tr><th>名称</th><th>版本</th><th>状态</th><th>操作</th></tr></thead><tbody>
+          <tr v-for="c in chars" :key="c.id">
+            <td>{{c.name}}</td><td>{{c.spec_version||'-'}}</td>
+            <td><span :class="'tag '+(c.is_active?'tag-on':'tag-off')">{{c.is_active?'活跃':'停用'}}</span></td>
+            <td><button class="btn btn-g" @click="editChar(c)">编辑</button><button class="btn btn-d" @click="delChar(c.id)">删除</button></td>
+          </tr>
+        </tbody></table>
+        <p v-if="!chars.length" style="text-align:center;padding:20px;color:#999">暂无角色，点击新建</p>
+      </div>
+      <!-- 模态框 -->
+      <div class="modal" v-if="showCharModal" @click.self="showCharModal=false">
+        <div class="modal-box">
+          <h3>{{charForm.id?'编辑':'新建'}}角色</h3>
+          <label>名称</label><input v-model="charForm.name">
+          <label>性格</label><textarea v-model="charForm.personality" rows="3"></textarea>
+          <label>开场白</label><textarea v-model="charForm.first_mes" rows="2"></textarea>
+          <div class="flex" style="justify-content:flex-end;margin-top:12px">
+            <button class="btn btn-g" @click="showCharModal=false">取消</button>
+            <button class="btn btn-p" @click="saveChar">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 世界书 -->
+    <div class="main" v-if="page==='worldbooks'">
+      <h3>📚 世界书</h3>
+      <div class="card" style="padding:12px;margin-top:12px">
+        <table><thead><tr><th>名称</th><th>条目数</th><th>类型</th><th>操作</th></tr></thead><tbody>
+          <tr v-for="w in wbs" :key="w.id">
+            <td>{{w.name}}</td><td>{{Object.keys(w.entries||{}).length}}</td>
+            <td>{{w.is_global?'全局':'角色'}}</td>
+            <td><button class="btn btn-d" @click="delWb(w.id)">删除</button></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- 预设 -->
+    <div class="main" v-if="page==='presets'">
+      <h3>⚙️ 预设</h3>
+      <div class="card" style="padding:12px;margin-top:12px">
+        <table><thead><tr><th>名称</th><th>温度</th><th>Token上限</th><th>操作</th></tr></thead><tbody>
+          <tr v-for="p in pres" :key="p.id">
+            <td>{{p.name}}</td><td>{{p.temperature}}</td><td>{{p.max_tokens}}</td>
+            <td><button class="btn btn-d" @click="delPreset(p.id)">删除</button></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- 设置 -->
+    <div class="main" v-if="page==='settings'">
+      <h3>🔧 系统设置</h3>
+      <div class="card" style="margin-top:12px">
+        <h4>导出备份</h4>
+        <p style="color:#999;font-size:13px;margin-bottom:8px">包含所有角色、世界书、预设数据。API Key 自动脱敏。</p>
+        <button class="btn btn-p" @click="exportBackup">📥 一键导出</button>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h4>服务状态</h4>
+        <p id="svc-status" style="color:#2e7d32">● 运行中</p>
+        <p style="font-size:12px;color:#999;margin-top:4px">PID: - | 内存: -</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api'
+const PWD = 'nesttalk2026'
+
+const { createApp, ref, onMounted } = Vue
+
+createApp({
+  setup() {
+    const loggedIn = ref(document.cookie.includes('nesttalk_admin='+PWD))
+    const password = ref('')
+    const page = ref('chat')
+    const chars = ref([])
+    const wbs = ref([])
+    const pres = ref([])
+    const chatInput = ref('')
+    const chatMessages = ref([])
+    const chatLoading = ref(false)
+    const showCharModal = ref(false)
+    const charForm = ref({name:'',personality:'',first_mes:''})
+
+    function login() {
+      if (password.value === PWD) {
+        document.cookie = 'nesttalk_admin='+PWD+';path=/;max-age=86400'
+        loggedIn.value = true
+      } else {
+        alert('密码错误')
+      }
+    }
+    function logout() {
+      document.cookie = 'nesttalk_admin=;path=/;max-age=0'
+      loggedIn.value = false
+    }
+
+    async function loadData() {
+      try {
+        const [cr,wr,pr] = await Promise.all([
+          fetch(API+'/characters'), fetch(API+'/worldbooks'), fetch(API+'/presets')
+        ])
+        chars.value = await cr.json()
+        wbs.value = await wr.json()
+        pres.value = await pr.json()
+      } catch(e) {}
+    }
+
+    async function sendChat() {
+      if (!chatInput.value.trim() || chatLoading.value) return
+      chatMessages.value.push({role:'user',content:chatInput.value})
+      const msg = chatInput.value
+      chatInput.value = ''
+      chatLoading.value = true
+      try {
+        const r = await fetch(API+'/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,character_name:'小栖'})})
+        const d = await r.json()
+        chatMessages.value.push({role:'assistant',content:d.content})
+      } catch(e) {
+        chatMessages.value.push({role:'assistant',content:'抱歉，回复失败了...'})
+      }
+      chatLoading.value = false
+    }
+
+    async function saveChar() {
+      const url = charForm.value.id ? API+'/characters/'+charForm.value.id : API+'/characters'
+      const method = charForm.value.id ? 'PUT' : 'POST'
+      await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(charForm.value)})
+      showCharModal.value = false
+      await loadData()
+    }
+    function editChar(c) { charForm.value = {...c}; showCharModal.value = true }
+    async function delChar(id) { if(confirm('确定删除？')) {await fetch(API+'/characters/'+id,{method:'DELETE'}); loadData()} }
+    async function delWb(id) { if(confirm('确定删除？')) {await fetch(API+'/worldbooks/'+id,{method:'DELETE'}); loadData()} }
+    async function delPreset(id) { if(confirm('确定删除？')) {await fetch(API+'/presets/'+id,{method:'DELETE'}); loadData()} }
+    async function exportBackup() {
+      const r = await fetch(API+'/backup/export')
+      const d = await r.json()
+      const blob = new Blob([JSON.stringify(d,null,2)],{type:'application/json'})
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'nesttalk_backup_'+new Date().toISOString().slice(0,10)+'.json'
+      a.click()
+    }
+
+    onMounted(loadData)
+
+    return {
+      loggedIn,password,login,logout,page,
+      chars,wbs,pres,
+      chatInput,chatMessages,chatLoading,sendChat,
+      showCharModal,charForm,editChar,saveChar,delChar,delWb,delPreset,exportBackup
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>
