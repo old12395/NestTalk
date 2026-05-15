@@ -45,12 +45,14 @@ from app.api.worldbooks import router as worldbooks_router
 from app.api.presets import router as presets_router
 from app.api.chat import router as chat_router
 from app.api.backup import router as backup_router
+from app.api.memories import router as memories_router
 
 app.include_router(characters_router)
 app.include_router(worldbooks_router)
 app.include_router(presets_router)
 app.include_router(chat_router)
 app.include_router(backup_router)
+app.include_router(memories_router)
 
 # CORS
 app.add_middleware(

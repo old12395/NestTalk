@@ -3,6 +3,7 @@
 from typing import Optional, AsyncIterator
 from loguru import logger
 from app.services.llm_gateway.gateway import llm_gateway
+from app.services.memory.system import memory_system
 
 
 class ChatEngine:
@@ -160,30 +161,28 @@ class ChatEngine:
         character: dict,
         message: str,
         history: Optional[list[dict]] = None,
+        user_id: Optional[str] = None,
         user_name: str = "用户",
         world_book_entries: Optional[str] = None,
         memories: Optional[str] = None,
         preset: Optional[dict] = None,
         stream: bool = False,
+        enable_memory: bool = True,
         **llm_kwargs,
     ) -> dict | AsyncIterator:
-        """
-        核心对话方法。
-
-        Args:
-            character: 角色数据
-            message: 用户消息
-            history: 历史消息
-            user_name: 用户名
-            world_book_entries: 激活的世界书
-            memories: 长期记忆
-            preset: 预设配置（含 temperature 等参数）
-            stream: 是否流式输出
-
-        Returns:
-            {"content": "...", "tokens": 100, ...} 或 AsyncIterator（stream=True 时）
-        """
+        """核心对话方法"""
         history = history or []
+
+        # 0. 记忆检索（RAG）
+        if enable_memory and user_id and memories is None:
+            recalled = memory_system.recall(
+                user_id=user_id,
+                query=message,
+                top_k=5,
+            )
+            memories = memory_system.format_for_prompt(recalled)
+            if memories:
+                logger.debug(f"🧠 检索到 {len(recalled)} 条相关记忆")
 
         # 1. 构建 system prompt
         system_prompt = self.build_system_prompt(
@@ -219,13 +218,25 @@ class ChatEngine:
         )
 
         # 5. 调用 LLM
-        return await self.gateway.chat(
+        result = await self.gateway.chat(
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
             stream=stream,
             **llm_kwargs,
         )
+
+        # 6. 存储记忆（非流式）
+        if enable_memory and user_id and not stream and isinstance(result, dict):
+            reply = result.get("content", "")
+            if reply:
+                memory_system.remember_conversation(
+                    user_id=user_id,
+                    user_message=message,
+                    assistant_reply=reply,
+                )
+
+        return result
 
     async def chat_stream(
         self,

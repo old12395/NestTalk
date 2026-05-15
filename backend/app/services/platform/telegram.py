@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from loguru import logger
 
 from app.services.chat.engine import chat_engine
+from app.services.memory.system import memory_system
 from app.core.config import settings
 
 
@@ -142,6 +143,7 @@ class TelegramAdapter:
                 character=self._get_default_character(),
                 message=text,
                 history=session.get("history", []),
+                user_id=uid,
                 user_name=user.first_name or "用户",
             )
 
@@ -218,6 +220,13 @@ class TelegramAdapter:
             )
 
             reply = result.get("content", "（看到图片了，但不知道怎么描述...）")
+
+            # 存储记忆
+            memory_system.remember_conversation(
+                user_id=uid,
+                user_message=f"[图片] {caption}",
+                assistant_reply=reply,
+            )
 
             session.setdefault("history", []).append({"role": "user", "content": f"[图片] {caption}"})
             session["history"].append({"role": "assistant", "content": reply})
