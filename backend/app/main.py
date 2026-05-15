@@ -11,14 +11,25 @@ from loguru import logger
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期"""
-    logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} 启动中...")
+    logger.info(f"🪹 {settings.APP_NAME} v{settings.APP_VERSION} 启动中...")
     await init_db()
     logger.info("✅ 数据库初始化完成")
-    # TODO: 启动平台适配器
+
+    # 启动 Telegram Bot
+    if settings.TG_BOT_TOKEN:
+        from app.services.platform.telegram import tg_adapter
+        await tg_adapter.start()
+        logger.info("✅ Telegram Bot 已启动")
+    else:
+        logger.warning("⚠️ TG_BOT_TOKEN 未配置，Telegram Bot 未启动")
+
     # TODO: 启动定时任务调度器
     yield
+
     logger.info("👋 应用关闭中...")
-    # TODO: 关闭平台适配器
+    if settings.TG_BOT_TOKEN:
+        from app.services.platform.telegram import tg_adapter
+        await tg_adapter.stop()
 
 
 app = FastAPI(

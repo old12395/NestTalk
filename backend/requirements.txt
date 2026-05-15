@@ -42,6 +42,9 @@ pydantic-settings==2.7.*
 # Scheduled Tasks
 apscheduler==3.10.*
 
+# Telegram Bot
+python-telegram-bot==21.10.*
+
 # Utilities
 python-dotenv==1.0.*
 loguru==0.7.*

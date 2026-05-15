@@ -1,6 +1,10 @@
-# NestTalk（栖言）
+# 🪹 NestTalk 栖言
 
-> 🦊 AI 情感陪聊机器人 — 兼容酒馆角色卡/世界书/预设，多平台·多模态·主动交互
+> *心有归栖，万事可轻言 · Find your haven, speak your heart freely*
+>
+> AI 情感陪聊机器人 — 兼容酒馆角色卡/世界书/预设，多平台·多模态·主动交互
+>
+> [GitHub](https://github.com/old12395/NestTalk)
 
 ## 特性
 
