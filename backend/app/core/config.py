@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
 
     # 数据库
-    DATABASE_URL: str = "postgresql+asyncpg://nesttalk:nesttalk_secret@localhost:5432/nesttalk"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./data/nesttalk.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # LLM 主模型

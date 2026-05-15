@@ -18,8 +18,11 @@ async def lifespan(app: FastAPI):
     # 启动 Telegram Bot
     if settings.TG_BOT_TOKEN:
         from app.services.platform.telegram import tg_adapter
-        await tg_adapter.start()
-        logger.info("✅ Telegram Bot 已启动")
+        if tg_adapter:
+            await tg_adapter.start()
+            logger.info("✅ Telegram Bot 已启动")
+        else:
+            logger.warning("⚠️ Telegram Bot 初始化失败，检查 Token")
     else:
         logger.warning("⚠️ TG_BOT_TOKEN 未配置，Telegram Bot 未启动")
 
@@ -29,7 +32,8 @@ async def lifespan(app: FastAPI):
     logger.info("👋 应用关闭中...")
     if settings.TG_BOT_TOKEN:
         from app.services.platform.telegram import tg_adapter
-        await tg_adapter.stop()
+        if tg_adapter:
+            await tg_adapter.stop()
 
 
 app = FastAPI(

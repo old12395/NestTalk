@@ -315,5 +315,9 @@ class TelegramAdapter:
             logger.error(f"主动消息发送失败: {e}")
 
 
-# 全局适配器实例
-tg_adapter = TelegramAdapter()
+# 全局适配器实例（延迟初始化，无 Token 时为 None）
+tg_adapter = None
+try:
+    tg_adapter = TelegramAdapter()
+except ValueError:
+    pass
