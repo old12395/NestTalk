@@ -5,7 +5,13 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/dashboard',
+      redirect: '/chat',
+    },
+    {
+      path: '/chat',
+      name: 'Chat',
+      component: () => import('@/views/Conversations.vue'),
+      meta: { title: '对话', icon: 'chatbubbles' },
     },
     {
       path: '/dashboard',
@@ -30,12 +36,6 @@ const router = createRouter({
       name: 'Presets',
       component: () => import('@/views/Presets.vue'),
       meta: { title: '预设管理', icon: 'settings' },
-    },
-    {
-      path: '/conversations',
-      name: 'Conversations',
-      component: () => import('@/views/Conversations.vue'),
-      meta: { title: '对话监控', icon: 'chatbubbles' },
     },
     {
       path: '/models',

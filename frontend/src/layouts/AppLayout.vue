@@ -21,11 +21,11 @@ const settings = useSettingsStore()
 const drawerOpen = ref(false)
 
 const menuOptions = [
+  { label: '对话', key: '/chat', icon: ChatbubblesOutline },
   { label: '仪表盘', key: '/dashboard', icon: HomeOutline },
   { label: '角色管理', key: '/characters', icon: PeopleOutline },
   { label: '世界书', key: '/worldbooks', icon: BookOutline },
   { label: '预设管理', key: '/presets', icon: SettingsOutline },
-  { label: '对话监控', key: '/conversations', icon: ChatbubblesOutline },
   { label: '模型配置', key: '/models', icon: HardwareChipOutline },
   { label: '平台连接', key: '/platforms', icon: CloudOutline },
   { label: '主动交互', key: '/proactive', icon: NotificationsOutline },
