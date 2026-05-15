@@ -27,6 +27,11 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("⚠️ TG_BOT_TOKEN 未配置")
 
+    # 启动主动交互引擎
+    from app.services.proactive.engine import proactive_engine
+    await proactive_engine.start()
+    logger.info("✅ 主动交互引擎就绪")
+
     yield
 
     logger.info("👋 应用关闭中...")
@@ -83,6 +88,7 @@ from app.api.presets import router as presets_router
 from app.api.chat import router as chat_router
 from app.api.backup import router as backup_router
 from app.api.memories import router as memories_router
+from app.api.admin import router as admin_router
 
 app.include_router(characters_router)
 app.include_router(worldbooks_router)
@@ -90,6 +96,7 @@ app.include_router(presets_router)
 app.include_router(chat_router)
 app.include_router(backup_router)
 app.include_router(memories_router)
+app.include_router(admin_router)
 
 
 # ─── 管理面板（SPA Catch-all，必须在最后）─────────
