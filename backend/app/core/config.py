@@ -73,7 +73,10 @@ class Settings(BaseSettings):
     HISTORY_MAX_MESSAGES: int = 20
     SUMMARY_THRESHOLD: int = 15  # 超过此轮数触发摘要
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # Admin
+    ADMIN_PASSWORD: str = "nesttalk2026"
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "allow"}
 
 
 settings = Settings()
