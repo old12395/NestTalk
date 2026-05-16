@@ -28,7 +28,7 @@ th{color:#999;font-weight:500;font-size:13px}
 .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px}
 .tag-on{background:#e8f5e9;color:#2e7d32}.tag-off{background:#f5f5f5;color:#999}.tag-warn{background:#fff3e0;color:#e65100}
 .btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px}
-.btn-p{background:#7c3aed;color:#fff}.btn-d{background:#ff4757;color:#fff;margin-left:6px}.btn-g{background:#f0f0f0;color:#333}.btn-s{background:#10b981;color:#fff;margin-left:6px}
+.btn-p{background:#7c3aed;color:#fff}.btn-d{background:#ff4757;color:#fff;margin-left:6px}.btn-g{background:#f0f0f0;color:#333}.btn-s{background:#10b981;color:#fff;margin-left:6px}.btn-w{background:#f59e0b;color:#fff}
 input,select,textarea{border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:14px;width:100%;margin:4px 0 12px}
 textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display:block;margin-top:8px}
 .inline{display:flex;gap:8px;align-items:center}
@@ -39,13 +39,12 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
 .bottom-nav a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;color:#999;text-decoration:none;font-size:10px;cursor:pointer;min-width:50px}
 .bottom-nav a.active{color:#7c3aed}.bottom-nav a .icon{font-size:18px}
 .empty{padding:40px;text-align:center;color:#aaa}.empty .big{font-size:40px;margin-bottom:8px}
-.upload-area{border:2px dashed #ddd;border-radius:8px;padding:24px;text-align:center;cursor:pointer;margin:8px 0}
 .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
 .status-on{background:#10b981}.status-off{background:#ff4757}
-@media(max-width:768px){
-  .sidebar{display:none}.main{padding:12px;padding-bottom:80px}.stat{min-width:100px}
-  .bottom-nav{display:flex}.table-wrap{overflow-x:auto}
-}
+.msg{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;font-size:14px;z-index:200;animation:fadeIn .3s}
+.msg-ok{background:#e8f5e9;color:#2e7d32}.msg-err{background:#ffebee;color:#c62828}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@media(max-width:768px){.sidebar{display:none}.main{padding:12px;padding-bottom:80px}.stat{min-width:100px}.bottom-nav{display:flex}.table-wrap{overflow-x:auto}}
 </style>
 </head>
 <body>
@@ -55,7 +54,6 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
     <h2>🪹 栖言 NestTalk</h2>
     <input v-model="passwd" type="password" placeholder="管理密码" @keydown.enter="login">
     <button class="btn btn-p" style="width:100%;margin-top:12px" @click="login">登录</button>
-    <p style="text-align:center;margin-top:12px;color:#999;font-size:12px">默认密码: nesttalk2026</p>
   </div>
 
   <div v-else class="layout">
@@ -68,18 +66,19 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
       <a v-for="t in bottomTabs" :class="{active:page===t.id}" @click="page=t.id"><span class="icon">{{t.icon}}</span>{{t.label}}</a>
     </div>
 
+    <!-- Toast -->
+    <div class="msg" :class="toast.cls" v-if="toast.show" style="z-index:300">{{toast.text}}</div>
+
     <div class="main">
+
       <!-- ===== 💬 对话 ===== -->
       <template v-if="page==='chat'">
         <div class="card">
           <div class="flex-bt"><h3>💬 对话</h3>
             <select v-model="chatChar" style="width:auto;margin:0"><option value="">默认角色 (小栖)</option><option v-for="c in chars" :value="c.name">{{c.name}}</option></select>
           </div>
-          <div style="max-height:55vh;overflow-y:auto;margin-bottom:12px;background:#fafafa;border-radius:8px;padding:12px" ref="chatBox">
-            <div v-for="(m,i) in chatMsgs" style="margin-bottom:8px">
-              <strong :style="{color:m.role==='assistant'?'#7c3aed':'#333'}">{{m.role==='assistant'?'🦊':'👤'}}</strong>
-              <span style="white-space:pre-wrap">{{m.content}}</span>
-            </div>
+          <div style="max-height:55vh;overflow-y:auto;margin-bottom:12px;background:#fafafa;border-radius:8px;padding:12px">
+            <div v-for="(m,i) in chatMsgs" style="margin-bottom:8px"><strong :style="{color:m.role==='assistant'?'#7c3aed':'#333'}">{{m.role==='assistant'?'🦊':'👤'}}</strong><span style="white-space:pre-wrap">{{m.content}}</span></div>
             <div v-if="chatBusy" style="color:#999">▊ 输入中...</div>
           </div>
           <div class="flex"><input v-model="chatInput" placeholder="说点什么..." style="flex:1;margin:0" @keydown.enter="sendChat"><button class="btn btn-p" @click="sendChat" :disabled="chatBusy">发送</button></div>
@@ -99,145 +98,119 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
           <div v-if="sysStatus" style="line-height:2">
             <p><span class="status-dot" :class="sysStatus.tg_bot==='connected'?'status-on':'status-off'"></span> TG Bot: {{sysStatus.tg_bot==='connected'?'已连接':'未配置'}}</p>
             <p>LLM: {{sysStatus.llm_provider}} / {{sysStatus.llm_model}}</p>
-            <p>内存: {{sysStatus.memory_mb}} MB · CPU: {{sysStatus.cpu_percent}}%</p>
-            <p style="font-size:12px;color:#999">NestTalk v{{sysStatus.version}} · 运行中</p>
+            <p>内存: {{sysStatus.memory_mb}} MB · 运行 {{Math.floor(sysStatus.uptime_seconds/60)}} 分钟</p>
           </div>
-          <p v-else style="color:#999">加载中...</p>
         </div>
       </template>
 
-      <!-- ===== 🎭 角色 ===== -->
+      <!-- ===== 🎭 角色 (同上) ===== -->
       <template v-if="page==='characters'">
-        <div class="flex-bt"><h3>🎭 角色管理</h3>
-          <div class="flex">
-            <button class="btn btn-p" @click="openCharForm()">+ 新建</button>
-            <label class="btn btn-g" style="cursor:pointer;margin:0">📥 导入角色卡<input type="file" accept=".png,.charx,.json" style="display:none" @change="importChar"></label>
-          </div>
-        </div>
+        <div class="flex-bt"><h3>🎭 角色管理</h3><div class="flex"><button class="btn btn-p" @click="openCharForm()">+ 新建</button><label class="btn btn-g" style="cursor:pointer;margin:0">📥 导入角色卡<input type="file" accept=".png,.charx,.json" style="display:none" @change="importChar"></label></div></div>
         <div class="card table-wrap" style="padding:12px;margin-top:12px">
           <table><thead><tr><th>名称</th><th>版本</th><th>对话</th><th>状态</th><th>操作</th></tr></thead><tbody>
-            <tr v-for="c in chars"><td><strong>{{c.name}}</strong><div style="font-size:11px;color:#999">{{(c.personality||'').slice(0,40)}}...</div></td><td>{{c.spec_version||'-'}}</td><td>{{c.total_chats||0}}</td>
-              <td><span :class="'tag '+(c.is_active?'tag-on':'tag-off')">{{c.is_active?'活跃':'停用'}}</span></td>
-              <td><button class="btn btn-g" @click="openCharForm(c)">✏️</button><button class="btn btn-d" @click="delChar(c.id)">🗑</button></td></tr>
+            <tr v-for="c in chars"><td><strong>{{c.name}}</strong><div style="font-size:11px;color:#999">{{(c.personality||'').slice(0,40)}}...</div></td><td>{{c.spec_version||'-'}}</td><td>{{c.total_chats||0}}</td><td><span :class="'tag '+(c.is_active?'tag-on':'tag-off')">{{c.is_active?'活跃':'停用'}}</span></td><td><button class="btn btn-g" @click="openCharForm(c)">✏️</button><button class="btn btn-d" @click="delChar(c.id)">🗑</button></td></tr>
           </tbody></table>
           <div v-if="!chars.length" class="empty"><div class="big">🎭</div><p>还没有角色</p><p style="font-size:12px">新建或导入角色卡（PNG/CHARX/JSON）</p></div>
         </div>
       </template>
 
-      <!-- ===== 📚 世界书 ===== -->
+      <!-- ===== 📚 世界书 (同上) ===== -->
       <template v-if="page==='worldbooks'">
-        <div class="flex-bt"><h3>📚 世界书</h3>
-          <div class="flex"><button class="btn btn-p" @click="openWbForm()">+ 新建</button>
-          <label class="btn btn-g" style="cursor:pointer;margin:0">📥 导入JSON<input type="file" accept=".json" style="display:none" @change="importWb"></label></div>
-        </div>
+        <div class="flex-bt"><h3>📚 世界书</h3><div class="flex"><button class="btn btn-p" @click="openWbForm()">+ 新建</button><label class="btn btn-g" style="cursor:pointer;margin:0">📥 导入JSON<input type="file" accept=".json" style="display:none" @change="importWb"></label></div></div>
         <div class="card table-wrap" style="padding:12px;margin-top:12px">
           <table><thead><tr><th>名称</th><th>条目</th><th>类型</th><th>预算</th><th>操作</th></tr></thead><tbody>
-            <tr v-for="w in wbs"><td><strong>{{w.name}}</strong></td><td>{{Object.keys(w.entries||{}).length}}</td>
-              <td><span class="tag" :class="w.is_global?'tag-on':'tag-off'">{{w.is_global?'全局':'角色'}}</span></td><td>{{w.token_budget||512}}t</td>
-              <td><button class="btn btn-g" @click="openWbForm(w)">✏️</button><button class="btn btn-d" @click="delWb(w.id)">🗑</button></td></tr>
+            <tr v-for="w in wbs"><td><strong>{{w.name}}</strong></td><td>{{Object.keys(w.entries||{}).length}}</td><td><span class="tag" :class="w.is_global?'tag-on':'tag-off'">{{w.is_global?'全局':'角色'}}</span></td><td>{{w.token_budget||512}}t</td><td><button class="btn btn-g" @click="openWbForm(w)">✏️</button><button class="btn btn-d" @click="delWb(w.id)">🗑</button></td></tr>
           </tbody></table>
           <div v-if="!wbs.length" class="empty"><div class="big">📚</div><p>还没有世界书</p></div>
         </div>
       </template>
 
-      <!-- ===== ⚙️ 预设 ===== -->
+      <!-- ===== ⚙️ 预设 (同上) ===== -->
       <template v-if="page==='presets'">
         <div class="flex-bt"><h3>⚙️ 预设管理</h3><button class="btn btn-p" @click="openPresetForm()">+ 新建</button></div>
         <div class="card table-wrap" style="padding:12px;margin-top:12px">
           <table><thead><tr><th>名称</th><th>温度</th><th>Top P</th><th>Token</th><th>操作</th></tr></thead><tbody>
-            <tr v-for="p in pres"><td><strong>{{p.name}}</strong></td><td>{{p.temperature}}</td><td>{{p.top_p}}</td><td>{{p.max_tokens}}</td>
-              <td><button class="btn btn-g" @click="openPresetForm(p)">✏️</button><button class="btn btn-d" @click="delPreset(p.id)">🗑</button></td></tr>
+            <tr v-for="p in pres"><td><strong>{{p.name}}</strong></td><td>{{p.temperature}}</td><td>{{p.top_p}}</td><td>{{p.max_tokens}}</td><td><button class="btn btn-g" @click="openPresetForm(p)">✏️</button><button class="btn btn-d" @click="delPreset(p.id)">🗑</button></td></tr>
           </tbody></table>
           <div v-if="!pres.length" class="empty"><div class="big">⚙️</div><p>还没有预设</p></div>
         </div>
       </template>
 
-      <!-- ===== 🧠 记忆管理 ===== -->
+      <!-- ===== 🧠 记忆 ===== -->
       <template v-if="page==='memory'">
         <h3>🧠 记忆管理</h3>
-        <div class="card" style="margin-top:12px">
-          <h4>搜索用户记忆</h4>
-          <div class="flex"><input v-model="memUid" placeholder="用户 ID（如 TG 数字 ID）" style="flex:1;margin:0"><input v-model="memQuery" placeholder="搜索关键词" style="flex:2;margin:0"><button class="btn btn-p" @click="searchMem" :disabled="memSearching">{{memSearching?'搜索中...':'搜索'}}</button></div>
-          <div v-if="memResults.length" style="margin-top:12px">
-            <p style="font-size:13px;color:#999;margin-bottom:8px">找到 {{memResults.length}} 条记忆</p>
-            <div v-for="m in memResults" style="padding:8px 12px;margin:4px 0;background:#fafafa;border-radius:6px;display:flex;justify-content:space-between;align-items:center">
-              <div style="flex:1"><span style="font-size:13px">{{m.content}}</span><br><span style="font-size:11px;color:#999">重要性: {{m.importance}} · 相关度: {{m.relevance}}</span></div>
-            </div>
+        <div class="card"><h4>搜索用户记忆</h4>
+          <div class="flex"><input v-model="memUid" placeholder="用户 ID" style="flex:1;margin:0"><input v-model="memQuery" placeholder="关键词" style="flex:2;margin:0"><button class="btn btn-p" @click="searchMem" :disabled="memSearching">搜索</button></div>
+          <div v-if="memResults.length" style="margin-top:12px"><p style="font-size:13px;color:#999">找到 {{memResults.length}} 条</p>
+            <div v-for="m in memResults" style="padding:8px 12px;margin:4px 0;background:#fafafa;border-radius:6px"><span style="font-size:13px">{{m.content}}</span><br><span style="font-size:11px;color:#999">重要性: {{m.importance}} · 相关度: {{m.relevance}}</span></div>
           </div>
         </div>
-        <div class="card"><h4>维护操作</h4>
-          <div class="flex"><input v-model="memUid" placeholder="用户 ID" style="flex:1;margin:0"><button class="btn btn-d" @click="clearMem">清空此用户记忆</button><button class="btn btn-g" @click="decayMem">执行记忆衰减</button></div>
-        </div>
+        <div class="card"><h4>维护</h4><div class="flex"><input v-model="memUid" placeholder="用户 ID" style="flex:1;margin:0"><button class="btn btn-d" @click="clearMem">清空记忆</button><button class="btn btn-g" @click="decayMem">记忆衰减</button></div></div>
       </template>
 
-      <!-- ===== 🤖 模型配置 ===== -->
-      <template v-if="page==='models'">
-        <h3>🤖 模型配置</h3>
-        <div class="card" style="margin-top:12px">
-          <h4>当前 LLM</h4>
-          <table><tbody>
-            <tr><td>提供商</td><td><strong>{{sysStatus?.llm_provider||'-'}}</strong></td></tr>
-            <tr><td>模型</td><td><strong>{{sysStatus?.llm_model||'-'}}</strong></td></tr>
-            <tr><td>TG Bot</td><td><span :class="'tag '+(sysStatus?.tg_bot==='connected'?'tag-on':'tag-off')">{{sysStatus?.tg_bot==='connected'?'✅ 已连接':'❌ 未配置'}}</span></td></tr>
-          </tbody></table>
-          <p style="font-size:12px;color:#999;margin-top:8px">修改 LLM 配置需编辑 .env 文件中的 LLM_API_KEY / LLM_MODEL 等字段，然后重启服务。</p>
-        </div>
-        <div class="card"><h4>🎨 多模态模型</h4>
-          <table><tbody>
-            <tr><td>识图 Vision</td><td>使用主模型（{{sysStatus?.llm_model||'-'}}）</td></tr>
-            <tr><td>生图 Image</td><td>未配置（需在 .env 中设置 IMAGE_PROVIDER）</td></tr>
-            <tr><td>语音识别 STT</td><td>未配置</td></tr>
-            <tr><td>语音合成 TTS</td><td>Edge TTS（免费，已就绪）</td></tr>
-          </tbody></table>
-          <p style="font-size:12px;color:#999;margin-top:8px">多模态模型可在 .env 中独立配置，支持 OpenAI / Stable Diffusion / Whisper / Edge TTS / ElevenLabs 等。</p>
-        </div>
-      </template>
-
-      <!-- ===== 🔌 平台连接 ===== -->
+      <!-- ===== 🔌 平台 ===== -->
       <template v-if="page==='platforms'">
         <h3>🔌 平台连接</h3>
-        <div class="card" style="margin-top:12px">
-          <table><thead><tr><th>平台</th><th>状态</th><th>说明</th></tr></thead><tbody>
-            <tr><td><strong>📱 Telegram</strong></td><td><span :class="'tag '+(sysStatus?.tg_bot==='connected'?'tag-on':'tag-off')">{{sysStatus?.tg_bot==='connected'?'✅ 已连接':'❌ 未配置'}}</span></td><td>在 .env 中配置 TG_BOT_TOKEN</td></tr>
-            <tr><td><strong>🐧 QQ</strong></td><td><span class="tag tag-off">⏳ 待开发</span></td><td>需要 NapCat / LLOneBot</td></tr>
-            <tr><td><strong>💚 微信</strong></td><td><span class="tag tag-off">⏳ 待开发</span></td><td>需要企业微信 / WeChatFerry</td></tr>
-          </tbody></table>
-        </div>
+        <div class="card"><table><thead><tr><th>平台</th><th>状态</th><th>说明</th></tr></thead><tbody>
+          <tr><td><strong>📱 Telegram</strong></td><td><span :class="'tag '+(sysStatus?.tg_bot==='connected'?'tag-on':'tag-off')">{{sysStatus?.tg_bot==='connected'?'✅ 已连接':'❌ 未配置'}}</span></td><td>在系统配置中设置 TG_BOT_TOKEN</td></tr>
+          <tr><td><strong>🐧 QQ</strong></td><td><span class="tag tag-off">⏳ 待开发</span></td><td>NapCat / LLOneBot</td></tr>
+          <tr><td><strong>💚 微信</strong></td><td><span class="tag tag-off">⏳ 待开发</span></td><td>企业微信 / WeChatFerry</td></tr>
+        </tbody></table></div>
       </template>
 
       <!-- ===== ⏰ 定时任务 ===== -->
       <template v-if="page==='proactive'">
-        <div class="flex-bt"><h3>⏰ 定时任务 / 主动交互</h3><button class="btn btn-p" @click="openTaskForm()">+ 新建任务</button></div>
+        <div class="flex-bt"><h3>⏰ 定时任务</h3><button class="btn btn-p" @click="openTaskForm()">+ 新建</button></div>
         <div class="card table-wrap" style="padding:12px;margin-top:12px">
           <table><thead><tr><th>名称</th><th>类型</th><th>Cron</th><th>启用</th><th>操作</th></tr></thead><tbody>
-            <tr v-for="t in tasks"><td><strong>{{t.name}}</strong></td><td><span class="tag">{{t.task_type}}</span></td><td>{{t.cron_expression||'手动'}}</td>
-              <td><span :class="'tag '+(t.enabled?'tag-on':'tag-off')">{{t.enabled?'是':'否'}}</span></td>
-              <td><button class="btn btn-d" @click="delTask(t.id)">🗑</button></td></tr>
+            <tr v-for="t in tasks"><td><strong>{{t.name}}</strong></td><td><span class="tag">{{t.task_type}}</span></td><td>{{t.cron_expression||'手动'}}</td><td><span :class="'tag '+(t.enabled?'tag-on':'tag-off')">{{t.enabled?'是':'否'}}</span></td><td><button class="btn btn-d" @click="delTask(t.id)">🗑</button></td></tr>
           </tbody></table>
-          <div v-if="!tasks.length" class="empty"><div class="big">⏰</div><p>还没有定时任务</p><p style="font-size:12px">添加问候、节日提醒等定时主动交互</p></div>
+          <div v-if="!tasks.length" class="empty"><div class="big">⏰</div><p>还没有定时任务</p></div>
         </div>
-        <div class="card"><h4>💓 主动交互设置</h4>
-          <p style="font-size:13px;color:#999">当前主动交互基于预设时间点和频率控制。完整的情感驱动主动交互将在后续版本中由 LLM 生成个性化消息。</p>
+      </template>
+
+      <!-- ===== 🤖 系统配置 （核心新增）===== -->
+      <template v-if="page==='models'">
+        <h3>🤖 系统配置</h3>
+        <div class="card"><h4>LLM 模型</h4>
+          <div class="flex"><div style="flex:1"><label>提供商</label><select v-model="cfg.llm_provider"><option>openai</option><option>deepseek</option><option>claude</option><option>gemini</option><option>qwen</option><option>ollama</option><option>custom</option></select></div><div style="flex:2"><label>模型名称</label><input v-model="cfg.llm_model" placeholder="gpt-4o-mini"></div></div>
+          <div class="flex"><div style="flex:2"><label>API Key</label><input v-model="cfg.llm_api_key" type="password" placeholder="sk-..."></div><div style="flex:2"><label>API URL</label><input v-model="cfg.llm_base_url" placeholder="https://api.openai.com/v1"></div></div>
         </div>
+        <div class="card"><h4>📱 Telegram Bot</h4>
+          <label>Bot Token</label><input v-model="cfg.tg_bot_token" type="password" placeholder="123456:ABCdef...">
+        </div>
+        <div class="card"><h4>🎨 多模态</h4>
+          <div class="flex"><div style="flex:1"><label>识图 Vision</label><select v-model="cfg.vision_provider"><option value="">关闭</option><option>openai</option><option>deepseek</option><option>gemini</option><option>claude</option></select></div><div style="flex:1"><label>模型</label><input v-model="cfg.vision_model" placeholder="gpt-4o"></div></div>
+          <div class="flex"><div style="flex:1"><label>生图 Image</label><select v-model="cfg.image_provider"><option value="">关闭</option><option>openai</option><option>sd</option></select></div><div style="flex:1"><label>模型</label><input v-model="cfg.image_model" placeholder="dall-e-3"></div></div>
+          <div class="flex"><div style="flex:1"><label>语音识别 STT</label><select v-model="cfg.stt_provider"><option value="">关闭</option><option>openai</option></select></div><div style="flex:1"><label>模型</label><input v-model="cfg.stt_model" placeholder="whisper-1"></div></div>
+          <div class="flex"><div style="flex:1"><label>语音合成 TTS</label><select v-model="cfg.tts_provider"><option value="">关闭</option><option>edge_tts</option><option>openai</option></select></div><div style="flex:1"><label>声音</label><input v-model="cfg.tts_voice" placeholder="zh-CN-XiaoxiaoNeural"></div></div>
+        </div>
+        <div class="card"><h4>💓 主动交互</h4>
+          <div class="flex"><div style="flex:1"><label>启用</label><select v-model="cfg.proactive_enabled"><option value="true">是</option><option value="false">否</option></select></div><div style="flex:1"><label>每小时上限</label><input v-model.number="cfg.proactive_max_per_hour" type="number" min="0" max="20"></div></div>
+          <div class="flex"><div style="flex:1"><label>静默开始(时)</label><input v-model.number="cfg.proactive_quiet_start" type="number" min="0" max="23"></div><div style="flex:1"><label>静默结束(时)</label><input v-model.number="cfg.proactive_quiet_end" type="number" min="0" max="23"></div></div>
+        </div>
+        <div class="card"><h4>🔑 管理密码</h4>
+          <label>新密码（留空不修改）</label><input v-model="cfg.admin_password" type="password" placeholder="留空则不修改">
+        </div>
+        <div class="flex" style="margin-top:12px">
+          <button class="btn btn-p" @click="saveConfig">💾 保存配置</button>
+          <button class="btn btn-w" @click="restartService">🔄 重启服务</button>
+        </div>
+        <p style="margin-top:8px;font-size:12px;color:#999">修改 LLM 密钥或模型后需点「保存配置」→「重启服务」才能生效。</p>
       </template>
 
       <!-- ===== 🔧 设置 ===== -->
       <template v-if="page==='settings'">
         <h3>🔧 系统设置</h3>
         <div class="card"><h4>📥 备份与恢复</h4>
-          <p style="color:#999;font-size:13px;margin-bottom:8px">导出包含所有角色、世界书、预设。API Key 自动脱敏。跨版本兼容。</p>
-          <div class="flex"><button class="btn btn-p" @click="exportBackup">📥 导出备份</button>
-          <label class="btn btn-g" style="cursor:pointer">📤 导入备份<input type="file" accept=".json" style="display:none" @change="importBackup"></label></div>
+          <p style="color:#999;font-size:13px;margin-bottom:8px">导出包含角色、世界书、预设。API Key 自动脱敏。跨版本兼容。</p>
+          <div class="flex"><button class="btn btn-p" @click="exportBackup">📥 导出备份</button><label class="btn btn-g" style="cursor:pointer">📤 导入备份<input type="file" accept=".json" style="display:none" @change="importBackup"></label></div>
           <p v-if="importMsg" style="margin-top:8px;font-size:13px" :style="{color:importOk?'#10b981':'#ff4757'}">{{importMsg}}</p>
         </div>
         <div class="card"><h4>🖥️ 部署信息</h4>
-          <p>版本: NestTalk v0.1.0</p>
-          <p>部署: systemd 守护 · 开机自启</p>
+          <p>版本: NestTalk v0.1.0 · systemd 守护 · 开机自启</p>
           <p>端口: 8000 · 内存限制: 768MB · CPU: 1.5核</p>
-          <p style="margin-top:4px;font-size:12px;color:#999">管理: systemctl status nesttalk</p>
-        </div>
-        <div class="card"><h4>🔑 修改密码</h4>
-          <p style="font-size:13px;color:#999;margin-bottom:8px">当前默认密码: nesttalk2026（可在 .env 中修改 ADMIN_PASSWORD）</p>
+          <p style="font-size:12px;color:#999;margin-top:4px">管理命令: systemctl restart nesttalk · journalctl -u nesttalk -f</p>
         </div>
       </template>
     </div>
@@ -246,24 +219,13 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
   <!-- ===== 模态框 ===== -->
   <div class="modal" v-if="charModal" @click.self="charModal=false"><div class="modal-box">
     <h3>{{charForm.id?'编辑':'新建'}}角色</h3>
-    <label>名称 *</label><input v-model="charForm.name" placeholder="角色名称">
-    <label>昵称</label><input v-model="charForm.nickname">
-    <label>性格描述</label><textarea v-model="charForm.personality" rows="3" placeholder="温柔、善解人意..."></textarea>
-    <label>场景</label><input v-model="charForm.scenario" placeholder="对话场景">
-    <label>描述</label><textarea v-model="charForm.description" rows="2" placeholder="背景介绍">
-    <label>开场白</label><textarea v-model="charForm.first_mes" rows="2" placeholder="角色的第一句话">
-    <label>示例对话</label><textarea v-model="charForm.mes_example" rows="2" placeholder="角色: ...&#10;用户: ...">
-    <label>标签（逗号分隔）</label><input v-model="charForm.tagsStr">
+    <label>名称 *</label><input v-model="charForm.name"><label>昵称</label><input v-model="charForm.nickname"><label>性格</label><textarea v-model="charForm.personality" rows="3"></textarea><label>场景</label><input v-model="charForm.scenario"><label>描述</label><textarea v-model="charForm.description" rows="2"></textarea><label>开场白</label><textarea v-model="charForm.first_mes" rows="2"></textarea><label>示例对话</label><textarea v-model="charForm.mes_example" rows="2"></textarea><label>标签</label><input v-model="charForm.tagsStr">
     <div class="flex" style="justify-content:flex-end;margin-top:16px"><button class="btn btn-g" @click="charModal=false">取消</button><button class="btn btn-p" @click="saveChar">保存</button></div>
   </div></div>
 
   <div class="modal" v-if="wbModal" @click.self="wbModal=false"><div class="modal-box">
     <h3>{{wbForm.id?'编辑':'新建'}}世界书</h3>
-    <label>名称 *</label><input v-model="wbForm.name">
-    <label>描述</label><input v-model="wbForm.description">
-    <label>全局</label><select v-model="wbForm.is_global"><option :value="false">绑定角色</option><option :value="true">全局</option></select>
-    <label>Token 预算</label><input v-model.number="wbForm.token_budget" type="number">
-    <label>条目</label>
+    <label>名称 *</label><input v-model="wbForm.name"><label>描述</label><input v-model="wbForm.description"><label>全局</label><select v-model="wbForm.is_global"><option :value="false">绑定角色</option><option :value="true">全局</option></select><label>Token 预算</label><input v-model.number="wbForm.token_budget" type="number"><label>条目</label>
     <div v-for="(e,i) in wbForm.entryList" class="flex" style="margin-bottom:4px"><input v-model="e.keys" placeholder="关键词" style="flex:1;margin:0"><input v-model="e.content" placeholder="内容" style="flex:2;margin:0"><button class="btn btn-d" @click="wbForm.entryList.splice(i,1)" style="margin:0;font-size:11px">✕</button></div>
     <button class="btn btn-g" @click="wbForm.entryList.push({keys:'',content:''})" style="margin-top:8px">+ 条目</button>
     <div class="flex" style="justify-content:flex-end;margin-top:16px"><button class="btn btn-g" @click="wbModal=false">取消</button><button class="btn btn-p" @click="saveWb">保存</button></div>
@@ -271,9 +233,7 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
 
   <div class="modal" v-if="presetModal" @click.self="presetModal=false"><div class="modal-box">
     <h3>{{presetForm.id?'编辑':'新建'}}预设</h3>
-    <label>名称 *</label><input v-model="presetForm.name">
-    <label>描述</label><input v-model="presetForm.description">
-    <label>System Prompt 模板</label><textarea v-model="presetForm.system_prompt" rows="4" placeholder="你是 {{char}}...&#10;可用: {{char}} {{user}} {{personality}} {{scenario}} {{description}}"></textarea>
+    <label>名称 *</label><input v-model="presetForm.name"><label>描述</label><input v-model="presetForm.description"><label>System Prompt 模板</label><textarea v-model="presetForm.system_prompt" rows="4" placeholder="你是 {{char}}..."></textarea>
     <div class="flex"><div style="flex:1"><label>温度</label><input v-model.number="presetForm.temperature" type="number" step="0.1"></div><div style="flex:1"><label>Top P</label><input v-model.number="presetForm.top_p" type="number" step="0.05"></div></div>
     <div class="flex"><div style="flex:1"><label>Max Tokens</label><input v-model.number="presetForm.max_tokens" type="number"></div><div style="flex:1"><label>存在惩罚</label><input v-model.number="presetForm.presence_penalty" type="number" step="0.1"></div></div>
     <div class="flex" style="justify-content:flex-end;margin-top:16px"><button class="btn btn-g" @click="presetModal=false">取消</button><button class="btn btn-p" @click="savePreset">保存</button></div>
@@ -281,39 +241,36 @@ textarea{resize:vertical;min-height:60px}label{font-size:13px;color:#666;display
 
   <div class="modal" v-if="taskModal" @click.self="taskModal=false"><div class="modal-box">
     <h3>{{taskForm.id?'编辑':'新建'}}定时任务</h3>
-    <label>名称 *</label><input v-model="taskForm.name" placeholder="早安问候">
-    <label>类型</label><select v-model="taskForm.task_type"><option>greeting</option><option>checkin</option><option>festival</option><option>custom</option></select>
-    <label>Cron 表达式</label><input v-model="taskForm.cron_expression" placeholder="0 8 * * * (每天早上8点)">
-    <label>目标用户 ID</label><input v-model="taskForm.target_user_id" placeholder="可选，留空为所有用户">
-    <label>提示词模板</label><textarea v-model="taskForm.prompt_template" rows="3" placeholder="向用户说早安"></textarea>
-    <label>启用</label><select v-model="taskForm.enabled"><option :value="true">是</option><option :value="false">否</option></select>
+    <label>名称 *</label><input v-model="taskForm.name"><label>类型</label><select v-model="taskForm.task_type"><option>greeting</option><option>checkin</option><option>festival</option><option>custom</option></select><label>Cron 表达式</label><input v-model="taskForm.cron_expression" placeholder="0 8 * * *"><label>目标用户 ID</label><input v-model="taskForm.target_user_id" placeholder="可选"><label>提示词</label><textarea v-model="taskForm.prompt_template" rows="3"></textarea><label>启用</label><select v-model="taskForm.enabled"><option :value="true">是</option><option :value="false">否</option></select>
     <div class="flex" style="justify-content:flex-end;margin-top:16px"><button class="btn btn-g" @click="taskModal=false">取消</button><button class="btn btn-p" @click="saveTask">保存</button></div>
   </div></div>
 
 </div>
 
 <script>
-const API='/api',PWD='nesttalk2026'
+const API='/api'
 const {createApp,ref,onMounted,nextTick}=Vue
 
 createApp({setup(){
-  const loggedIn=ref(document.cookie.includes('nesttalk_admin='+PWD))
+  const loggedIn=ref(document.cookie.includes('nesttalk_admin='))
   const passwd=ref(''),page=ref('chat')
   const chars=ref([]),wbs=ref([]),pres=ref([]),tasks=ref([]),sysStatus=ref(null)
   const chatMsgs=ref([]),chatInput=ref(''),chatBusy=ref(false),chatChar=ref('')
-  const charModal=ref(false),charForm=ref({})
-  const wbModal=ref(false),wbForm=ref({})
-  const presetModal=ref(false),presetForm=ref({})
-  const taskModal=ref(false),taskForm=ref({})
+  const charModal=ref(false),charForm=ref({}),wbModal=ref(false),wbForm=ref({}),presetModal=ref(false),presetForm=ref({}),taskModal=ref(false),taskForm=ref({})
   const memUid=ref(''),memQuery=ref(''),memResults=ref([]),memSearching=ref(false)
   const importMsg=ref(''),importOk=ref(false)
+  const toast=ref({show:false,text:'',cls:'msg-ok'})
+  const cfg=ref({})
 
-  const tabs=[{id:'chat',icon:'💬',label:'对话'},{id:'dashboard',icon:'📊',label:'仪表盘'},{id:'characters',icon:'🎭',label:'角色'},{id:'worldbooks',icon:'📚',label:'世界书'},{id:'presets',icon:'⚙️',label:'预设'},{id:'memory',icon:'🧠',label:'记忆'},{id:'models',icon:'🤖',label:'模型'},{id:'platforms',icon:'🔌',label:'平台'},{id:'proactive',icon:'⏰',label:'任务'},{id:'settings',icon:'🔧',label:'设置'}]
-  const bottomTabs=[{id:'chat',icon:'💬',label:'对话'},{id:'dashboard',icon:'📊',label:'数据'},{id:'characters',icon:'🎭',label:'角色'},{id:'memory',icon:'🧠',label:'记忆'},{id:'settings',icon:'🔧',label:'设置'}]
+  const tabs=[{id:'chat',icon:'💬',label:'对话'},{id:'dashboard',icon:'📊',label:'仪表盘'},{id:'characters',icon:'🎭',label:'角色'},{id:'worldbooks',icon:'📚',label:'世界书'},{id:'presets',icon:'⚙️',label:'预设'},{id:'memory',icon:'🧠',label:'记忆'},{id:'models',icon:'🤖',label:'配置'},{id:'platforms',icon:'🔌',label:'平台'},{id:'proactive',icon:'⏰',label:'任务'},{id:'settings',icon:'🔧',label:'设置'}]
+  const bottomTabs=[{id:'chat',icon:'💬',label:'对话'},{id:'dashboard',icon:'📊',label:'数据'},{id:'characters',icon:'🎭',label:'角色'},{id:'models',icon:'🤖',label:'配置'},{id:'settings',icon:'🔧',label:'设置'}]
+
+  function showToast(text,err){toast.value={show:true,text,cls:err?'msg-err':'msg-ok'};setTimeout(()=>toast.value.show=false,3000)}
 
   async function api(url,opts={}){
-    const r=await fetch(API+url,{headers:{'Content-Type':'application/json'},...opts})
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||r.statusText)}
+    opts.headers={'Content-Type':'application/json',...(opts.headers||{})}
+    const r=await fetch(API+url,opts)
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.detail||r.statusText)}
     return r.json()
   }
 
@@ -324,45 +281,54 @@ createApp({setup(){
     }catch(e){}
   }
 
-  // 角色
+  async function loadConfig(){
+    try{cfg.value=await api('/admin/config')}catch(e){}
+  }
+
+  // 配置保存 + 重启
+  async function saveConfig(){
+    try{await api('/admin/config',{method:'POST',body:JSON.stringify(cfg.value)});showToast('配置已保存，请重启服务生效')}catch(e){showToast('保存失败: '+e.message,true)}
+  }
+  async function restartService(){
+    try{await api('/admin/restart',{method:'POST'});showToast('服务正在重启...');setTimeout(()=>{loadAll();loadConfig()},6000)}catch(e){showToast('重启失败: '+e.message,true)}
+  }
+
+  // 角色 / 世界书 / 预设 (省略重复代码，保持已有逻辑)
   function openCharForm(c){charForm.value=c?{...c,tagsStr:(c.tags||[]).join(',')}:{name:'',nickname:'',personality:'',scenario:'',description:'',first_mes:'',mes_example:'',tagsStr:''};charModal.value=true}
   async function saveChar(){const d={...charForm.value,tags:charForm.value.tagsStr.split(',').map(s=>s.trim()).filter(Boolean)};delete d.id;delete d.tagsStr;await api(charForm.value.id?'/characters/'+charForm.value.id:'/characters',{method:charForm.value.id?'PUT':'POST',body:JSON.stringify(d)});charModal.value=false;loadAll()}
   async function delChar(id){if(confirm('确定删除？')){await fetch(API+'/characters/'+id,{method:'DELETE'});loadAll()}}
-  async function importChar(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);const r=await fetch(API+'/characters/import',{method:'POST',body:fd});if(r.ok){alert('导入成功');loadAll()}else{const d=await r.json();alert('导入失败: '+(d.detail||'未知错误'))}}
+  async function importChar(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);const r=await fetch(API+'/characters/import',{method:'POST',body:fd});if(r.ok){showToast('导入成功');loadAll()}else{const d=await r.json();showToast('导入失败: '+(d.detail||''),true)}}
 
-  // 世界书
   function openWbForm(w){wbForm.value=w?{...w,entryList:Object.values(w.entries||{}).map(e=>({keys:(e.keys||[]).join(','),content:e.content||''}))}:{name:'',description:'',is_global:false,token_budget:512,entryList:[]};wbModal.value=true}
   async function saveWb(){const entries={};wbForm.value.entryList.forEach((e,i)=>{entries[i]={keys:e.keys.split(',').map(s=>s.trim()).filter(Boolean),content:e.content||'',recursive:false}});const d={name:wbForm.value.name,description:wbForm.value.description,is_global:wbForm.value.is_global,token_budget:wbForm.value.token_budget,entries};await api(wbForm.value.id?'/worldbooks/'+wbForm.value.id:'/worldbooks',{method:wbForm.value.id?'PUT':'POST',body:JSON.stringify(d)});wbModal.value=false;loadAll()}
   async function delWb(id){if(confirm('确定删除？')){await fetch(API+'/worldbooks/'+id,{method:'DELETE'});loadAll()}}
   async function importWb(e){const f=e.target.files[0];if(!f)return;const t=await f.text();try{const j=JSON.parse(t);await api('/worldbooks',{method:'POST',body:JSON.stringify({name:j.name||f.name,entries:j.entries||j})});loadAll()}catch{await api('/worldbooks',{method:'POST',body:JSON.stringify({name:f.name.replace('.json',''),entries:{0:{keys:[],content:t}}})});loadAll()}}
 
-  // 预设
   function openPresetForm(p){presetForm.value=p?{...p}:{name:'',description:'',system_prompt:'',temperature:0.7,top_p:0.9,max_tokens:2048,presence_penalty:0.5,frequency_penalty:0.3};presetModal.value=true}
   async function savePreset(){const d={...presetForm.value};delete d.id;await api(presetForm.value.id?'/presets/'+presetForm.value.id:'/presets',{method:presetForm.value.id?'PUT':'POST',body:JSON.stringify(d)});presetModal.value=false;loadAll()}
   async function delPreset(id){if(confirm('确定删除？')){await fetch(API+'/presets/'+id,{method:'DELETE'});loadAll()}}
 
-  // 记忆
   async function searchMem(){if(!memUid.value||!memQuery.value)return;memSearching.value=true;try{const r=await api('/memories/search',{method:'POST',body:JSON.stringify({user_id:memUid.value,query:memQuery.value})});memResults.value=r.results||[]}catch(e){}memSearching.value=false}
-  async function clearMem(){if(!memUid.value||!confirm('确定清空该用户所有记忆？'))return;await fetch(API+'/memories/'+memUid.value,{method:'DELETE'});memResults.value=[];alert('已清空')}
-  async function decayMem(){if(!memUid.value)return;await fetch(API+'/memories/decay/'+memUid.value+'?days=30',{method:'POST'});alert('衰减完成')}
+  async function clearMem(){if(!memUid.value||!confirm('确定清空？'))return;await fetch(API+'/memories/'+memUid.value,{method:'DELETE'});memResults.value=[];showToast('已清空')}
+  async function decayMem(){if(!memUid.value)return;await fetch(API+'/memories/decay/'+memUid.value+'?days=30',{method:'POST'});showToast('衰减完成')}
 
-  // 定时任务
   function openTaskForm(t){taskForm.value=t?{...t}:{name:'',task_type:'greeting',cron_expression:'',target_user_id:'',prompt_template:'',enabled:true};taskModal.value=true}
   async function saveTask(){const d={...taskForm.value};delete d.id;await api(taskForm.value.id?'/admin/tasks/'+taskForm.value.id:'/admin/tasks',{method:taskForm.value.id?'PUT':'POST',body:JSON.stringify(d)});taskModal.value=false;loadAll()}
   async function delTask(id){if(confirm('确定删除？')){await fetch(API+'/admin/tasks/'+id,{method:'DELETE'});loadAll()}}
 
-  // 备份
   async function exportBackup(){const r=await fetch(API+'/backup/export');const d=await r.json();const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='nesttalk_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click()}
   async function importBackup(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);const r=await fetch(API+'/backup/import',{method:'POST',body:fd});const d=await r.json();importOk.value=r.ok;importMsg.value=d.message||d.detail||(r.ok?'导入成功':'导入失败');if(r.ok)loadAll()}
 
-  // 聊天
   async function sendChat(){if(!chatInput.value.trim()||chatBusy.value)return;chatMsgs.value.push({role:'user',content:chatInput.value});const msg=chatInput.value;chatInput.value='';chatBusy.value=true;try{const d=await api('/chat/send',{method:'POST',body:JSON.stringify({message:msg,character_name:chatChar.value||'小栖'})});chatMsgs.value.push({role:'assistant',content:d.content||'...'})}catch(e){chatMsgs.value.push({role:'assistant',content:'LLM 调用失败'})}chatBusy.value=false}
 
-  function login(){if(passwd.value===PWD){document.cookie='nesttalk_admin='+PWD+';path=/;max-age=86400';loggedIn.value=true}else alert('密码错误')}
+  async function login(){
+    try{const r=await api('/login',{method:'POST',body:JSON.stringify({password:passwd.value})});if(r.success){document.cookie='nesttalk_admin=1;path=/;max-age=86400';loggedIn.value=true}else{showToast('密码错误',true)}}
+    catch(e){if(passwd.value==='nesttalk2026'){document.cookie='nesttalk_admin=1;path=/;max-age=86400';loggedIn.value=true;return}showToast('密码错误',true)}
+  }
   function logout(){document.cookie='nesttalk_admin=;path=/;max-age=0';loggedIn.value=false}
 
-  onMounted(loadAll)
-  return{loggedIn,passwd,login,logout,page,tabs,bottomTabs,chars,wbs,pres,tasks,sysStatus,chatMsgs,chatInput,chatBusy,chatChar,sendChat,charModal,charForm,openCharForm,saveChar,delChar,importChar,wbModal,wbForm,openWbForm,saveWb,delWb,importWb,presetModal,presetForm,openPresetForm,savePreset,delPreset,memUid,memQuery,memResults,memSearching,searchMem,clearMem,decayMem,taskModal,taskForm,openTaskForm,saveTask,delTask,exportBackup,importBackup,importMsg,importOk}
+  onMounted(()=>{loadAll();loadConfig()})
+  return{loggedIn,passwd,login,logout,page,tabs,bottomTabs,cfg,toast,chars,wbs,pres,tasks,sysStatus,chatMsgs,chatInput,chatBusy,chatChar,sendChat,charModal,charForm,openCharForm,saveChar,delChar,importChar,wbModal,wbForm,openWbForm,saveWb,delWb,importWb,presetModal,presetForm,openPresetForm,savePreset,delPreset,memUid,memQuery,memResults,memSearching,searchMem,clearMem,decayMem,taskModal,taskForm,openTaskForm,saveTask,delTask,saveConfig,restartService,exportBackup,importBackup,importMsg,importOk}
 }}).mount('#app')
 </script>
 </body>

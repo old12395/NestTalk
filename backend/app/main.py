@@ -10,9 +10,20 @@ from app.core.database import init_db
 from loguru import logger
 
 
+def _read_admin_password() -> str:
+    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+    try:
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith("ADMIN_PASSWORD="):
+                    return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return "nesttalk2026"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期"""
     logger.info(f"🪹 {settings.APP_NAME} v{settings.APP_VERSION} 启动中...")
     await init_db()
     logger.info("✅ 数据库初始化完成")
@@ -22,12 +33,9 @@ async def lifespan(app: FastAPI):
         if tg_adapter:
             await tg_adapter.start()
             logger.info("✅ Telegram Bot 已启动")
-        else:
-            logger.warning("⚠️ Telegram Bot 初始化失败")
     else:
         logger.warning("⚠️ TG_BOT_TOKEN 未配置")
 
-    # 启动主动交互引擎
     from app.services.proactive.engine import proactive_engine
     await proactive_engine.start()
     logger.info("✅ 主动交互引擎就绪")
@@ -48,20 +56,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-ADMIN_PASSWORD = "nesttalk2026"
 
 
-# ─── API 路由（必须在 Catch-all 前注册）─────────
+# ─── API 路由 ─────────────────────────────────
 
 @app.get("/api/health")
 async def health_check():
@@ -69,19 +69,16 @@ async def health_check():
 
 @app.get("/api/info")
 async def app_info():
-    return {
-        "name": settings.APP_NAME, "version": settings.APP_VERSION,
-        "llm_provider": settings.LLM_PROVIDER, "llm_model": settings.LLM_MODEL,
-    }
+    return {"name": settings.APP_NAME, "version": settings.APP_VERSION, "llm_provider": settings.LLM_PROVIDER, "llm_model": settings.LLM_MODEL}
 
 @app.post("/api/login")
 async def api_login(request: Request):
     data = await request.json()
-    if data.get("password") == ADMIN_PASSWORD:
-        return {"success": True, "token": ADMIN_PASSWORD}
+    if data.get("password") == _read_admin_password():
+        return {"success": True, "token": data["password"]}
     return {"success": False, "message": "密码错误"}
 
-# 业务 API 路由
+# 业务路由
 from app.api.characters import router as characters_router
 from app.api.worldbooks import router as worldbooks_router
 from app.api.presets import router as presets_router
@@ -90,38 +87,23 @@ from app.api.backup import router as backup_router
 from app.api.memories import router as memories_router
 from app.api.admin import router as admin_router
 
-app.include_router(characters_router)
-app.include_router(worldbooks_router)
-app.include_router(presets_router)
-app.include_router(chat_router)
-app.include_router(backup_router)
-app.include_router(memories_router)
-app.include_router(admin_router)
+for r in [characters_router, worldbooks_router, presets_router, chat_router, backup_router, memories_router, admin_router]:
+    app.include_router(r)
 
 
-# ─── 管理面板（SPA Catch-all，必须在最后）─────────
+# ─── SPA 静态文件 ─────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.isfile(path):
-        return FileResponse(path)
-    return "<h1>NestTalk</h1>"
-
+    p = os.path.join(STATIC_DIR, "index.html")
+    return FileResponse(p) if os.path.isfile(p) else HTMLResponse("<h1>NestTalk</h1>")
 
 @app.get("/{path:path}")
 async def serve_static(path: str):
-    """静态文件 & SPA 兜底"""
-    # 跳过不存在的 API 路径
     if path.startswith("api/"):
-        return {"error": "not found", "path": path}
-
-    file_path = os.path.join(STATIC_DIR, path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-
-    # SPA 兜底
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.isfile(index_path):
-        return FileResponse(index_path)
-    return HTMLResponse("<h1>NestTalk - 栖言</h1>")
+        return {"error": "not found"}
+    fp = os.path.join(STATIC_DIR, path)
+    if os.path.isfile(fp):
+        return FileResponse(fp)
+    ip = os.path.join(STATIC_DIR, "index.html")
+    return FileResponse(ip) if os.path.isfile(ip) else HTMLResponse("<h1>NestTalk</h1>")
